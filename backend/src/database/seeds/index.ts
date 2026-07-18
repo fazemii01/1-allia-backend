@@ -24,6 +24,7 @@ import { Partnership } from '../../partnerships/entities/partnership.entity';
 import { PartnershipWhyUs } from '../../partnership-why-us/entities/partnership-why-us.entity';
 import { PartnershipCollaboration } from '../../partnership-collaborations/entities/partnership-collaboration.entity';
 import { PartnershipMoment } from '../../partnership-moments/entities/partnership-moment.entity';
+import { Therapist } from '../../therapists/entities/therapist.entity';
 
 const AppDataSource = new DataSource({
   type: 'postgres',
@@ -32,7 +33,7 @@ const AppDataSource = new DataSource({
   username: process.env.DATABASE_USER ?? 'postgres',
   password: process.env.DATABASE_PASS ?? 'postgres',
   database: process.env.DATABASE_NAME ?? 'alliakids_db',
-  entities: [User, LayananCategory, Layanan, WaTemplate, Partnership, PartnershipWhyUs, PartnershipCollaboration, PartnershipMoment],
+  entities: [User, LayananCategory, Layanan, WaTemplate, Partnership, PartnershipWhyUs, PartnershipCollaboration, PartnershipMoment, Therapist],
   synchronize: true,
 });
 
@@ -412,6 +413,62 @@ async function runSeeders() {
     if (existing) { console.log(`  ⏭️  Moment "${item.title}" already exists`); continue; }
     await momentRepo.save(momentRepo.create(item));
     console.log(`  ✅ Created Moment: ${item.title}`);
+  }
+
+  // ── Seed Therapists ──────────────────────────────────────────────
+  console.log('\n📦 Seeding Therapists...');
+  const therapistRepo = AppDataSource.getRepository(Therapist);
+  const THERAPISTS = [
+    {
+      name: 'Riska Amanda, M.Psi., Psikolog',
+      specialization: 'Psikolog Klinis Anak & Tumbuh Kembang',
+      phone: '081234567890',
+      bio: 'Tantrum & Emosi\nFobia Makanan / GTM\nTrauma Anak',
+      photo_url: 'https://storage.googleapis.com/pendaftaran-production/assets/v6/psikolog-placeholder-female.webp',
+      is_active: true,
+    },
+    {
+      name: 'Budi Satria, S.Tr.T.W.',
+      specialization: 'Terapis Wicara & Wicara Anak',
+      phone: '081234567891',
+      bio: 'Speech Delay\nKesulitan Artikulasi\nGagap Berbicara',
+      photo_url: 'https://storage.googleapis.com/pendaftaran-production/assets/v6/psikolog-placeholder-male.webp',
+      is_active: true,
+    },
+    {
+      name: 'Siti Rahma, S.Psi.',
+      specialization: 'Terapis Perilaku & Anak Berkebutuhan Khusus',
+      phone: '081234567892',
+      bio: 'Fokus & ADHD/ADD\nModifikasi Perilaku\nSosialisasi Anak',
+      photo_url: 'https://storage.googleapis.com/pendaftaran-production/assets/v6/psikolog-placeholder-female.webp',
+      is_active: true,
+    },
+    {
+      name: 'Diana Lestari, M.Psi., Psikolog',
+      specialization: 'Psikolog Klinis Anak & Remaja',
+      phone: '081234567893',
+      bio: 'Tumbuh Kembang\nKesulitan Belajar\nAdiksi Gadget',
+      photo_url: 'https://storage.googleapis.com/pendaftaran-production/assets/v6/psikolog-placeholder-female.webp',
+      is_active: true,
+    },
+    {
+      name: 'Hendra Wijaya, C.Ht.',
+      specialization: 'Praktisi Hipnoterapi Anak & Dewasa',
+      phone: '081234567894',
+      bio: 'Fobia Makan/Nasi\nTrauma & Fobia\nKecemasan & Motivasi',
+      photo_url: 'https://storage.googleapis.com/pendaftaran-production/assets/v6/psikolog-placeholder-male.webp',
+      is_active: true,
+    },
+  ];
+
+  for (const t of THERAPISTS) {
+    const existing = await therapistRepo.findOne({ where: { name: t.name } });
+    if (existing) {
+      console.log(`  Skip -> Therapist "${t.name}" already exists`);
+      continue;
+    }
+    await therapistRepo.save(therapistRepo.create(t));
+    console.log(`  ✅ Seeded therapist: ${t.name}`);
   }
 
   // ── Seed Users ───────────────────────────────────────────────────

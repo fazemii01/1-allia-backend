@@ -29,6 +29,11 @@ export class InvoicesController {
     return this.invoicesService.findAll(status);
   }
 
+  @Get('token/:token')
+  findByToken(@Param('token') token: string) {
+    return this.invoicesService.findByToken(token);
+  }
+
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.invoicesService.findOne(id);

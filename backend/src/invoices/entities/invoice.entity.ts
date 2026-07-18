@@ -23,6 +23,9 @@ export class Invoice {
   @Column({ type: 'varchar', length: 50, unique: true })
   invoice_number: string;
 
+  @Column({ type: 'varchar', length: 8, unique: true, nullable: true })
+  invoice_token: string;
+
   @Column({ type: 'int' })
   patient_id: number;
 

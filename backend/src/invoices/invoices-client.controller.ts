@@ -6,6 +6,16 @@ import { memoryStorage } from 'multer';
 import { extname } from 'path';
 import { MinioService } from '../shared/minio.service';
 
+@Controller('invoice')
+export class InvoicesPublicController {
+  constructor(private readonly invoicesService: InvoicesService) {}
+
+  @Get(':token')
+  findByToken(@Param('token') token: string) {
+    return this.invoicesService.findByToken(token);
+  }
+}
+
 @Controller('invoices/me')
 @UseGuards(JwtAuthGuard)
 export class InvoicesClientController {

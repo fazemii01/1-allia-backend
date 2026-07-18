@@ -4,6 +4,15 @@ import { Repository } from 'typeorm';
 import { Invoice } from './entities/invoice.entity';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 
+function generateInvoiceToken(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let token = '';
+  for (let i = 0; i < 8; i++) {
+    token += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return token;
+}
+
 @Injectable()
 export class InvoicesService {
   constructor(
@@ -41,15 +50,33 @@ export class InvoicesService {
     const count = await this.invoiceRepo.count();
     const invoiceNumber = `INV-${dateStr}-${String(count + 1).padStart(4, '0')}`;
 
+    // Auto-generate unique 8-char token
+    let invoiceToken = generateInvoiceToken();
+    let tokenExists = await this.invoiceRepo.findOne({ where: { invoice_token: invoiceToken } });
+    while (tokenExists) {
+      invoiceToken = generateInvoiceToken();
+      tokenExists = await this.invoiceRepo.findOne({ where: { invoice_token: invoiceToken } });
+    }
+
     const totalAmount = dto.items.reduce((sum, item) => sum + item.amount, 0);
 
     const invoice = this.invoiceRepo.create({
       ...dto,
       invoice_number: invoiceNumber,
+      invoice_token: invoiceToken,
       total_amount: totalAmount,
     });
 
     return this.invoiceRepo.save(invoice);
+  }
+
+  async findByToken(token: string): Promise<Invoice> {
+    const invoice = await this.invoiceRepo.findOne({
+      where: { invoice_token: token },
+      relations: { patient: true, appointment: true },
+    });
+    if (!invoice) throw new NotFoundException(`Invoice dengan token ${token} tidak ditemukan`);
+    return invoice;
   }
 
   async markPaid(id: number): Promise<Invoice> {

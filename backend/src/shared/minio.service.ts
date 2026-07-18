@@ -93,7 +93,10 @@ export class MinioService implements OnModuleInit {
                      this.configService.get<string>('MINIO_USE_SSL', 'false') === 'true';
       const protocol = useSSL ? 'https' : 'http';
       
-      return `${protocol}://${endPoint}:${port}/${this.bucketName}/${cleanFolder}/${filename}`;
+      const rawUrl = `${protocol}://${endPoint}:${port}/${this.bucketName}/${cleanFolder}/${filename}`;
+      return rawUrl
+        .replace('http://194.233.91.132:19000', 'https://storage.alliago.id')
+        .replace('http://storage.alliago.id', 'https://storage.alliago.id');
     } catch (err: any) {
       this.logger.error(`Failed to upload file to MinIO: ${err.message}`, err.stack);
       throw err;

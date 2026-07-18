@@ -38,6 +38,12 @@ async function bootstrap() {
       'ALTER TABLE "ak_layanan" ADD COLUMN IF NOT EXISTS "promo_ends_at" timestamp with time zone NULL'
     );
     console.log('Schema ensured: ak_layanan promo columns are present');
+
+    // Ensure therapist_id is nullable so deleting therapists doesn't violate foreign key NOT NULL
+    await dataSource.query(
+      'ALTER TABLE "ak_appointments" ALTER COLUMN "therapist_id" DROP NOT NULL'
+    );
+    console.log('Schema ensured: ak_appointments.therapist_id is nullable');
   } catch (err) {
     console.warn('Schema migration warning:', err.message);
   }

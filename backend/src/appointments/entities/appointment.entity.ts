@@ -22,8 +22,8 @@ export class Appointment {
   @JoinColumn({ name: 'patient_id' })
   patient: Patient;
 
-  @Column({ name: 'therapist_id', type: 'int' })
-  therapist_id: number;
+  @Column({ name: 'therapist_id', type: 'int', nullable: true })
+  therapist_id: number | null;
 
   @ManyToOne(() => Therapist, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'therapist_id' })

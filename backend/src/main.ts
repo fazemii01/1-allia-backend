@@ -15,21 +15,18 @@ async function bootstrap() {
   console.log('NestJS Database Name:', configService.get('DATABASE_NAME', 'alliakids_db'));
   console.log('====================================');
   
-  // Auto-run schema sync for missing mobile_image_url column in ak_banners
+  // Ensure mobile_image_url column exists in ak_banners table
+  // Using IF NOT EXISTS so this is safe to run on every startup
   try {
     const dataSource = app.get(DataSource);
-    const queryRunner = dataSource.createQueryRunner();
-    await queryRunner.connect();
-    const hasColumn = await queryRunner.hasColumn('ak_banners', 'mobile_image_url');
-    if (!hasColumn) {
-      console.log('Column ak_banners.mobile_image_url does not exist. Adding it dynamically...');
-      await queryRunner.query('ALTER TABLE "ak_banners" ADD COLUMN "mobile_image_url" character varying(255)');
-      console.log('Column mobile_image_url added successfully.');
-    }
-    await queryRunner.release();
+    await dataSource.query(
+      'ALTER TABLE "ak_banners" ADD COLUMN IF NOT EXISTS "mobile_image_url" character varying(255) NULL'
+    );
+    console.log('Schema ensured: ak_banners.mobile_image_url column is present');
   } catch (err) {
-    console.warn('Auto migration warning (could be running first seed):', err.message);
+    console.warn('Schema migration warning:', err.message);
   }
+
 
   // Serve static payment proofs / receipts
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
@@ -45,5 +42,25 @@ async function bootstrap() {
     new ValidationPipe({ whitelist: true, transform: true }),
   );
   await app.listen(process.env.PORT ?? 3001);
+
+  // Re-verify the column 5 seconds after startup to detect if another process drops it
+  setTimeout(async () => {
+    try {
+      const dataSource = app.get(DataSource);
+      const result = await dataSource.query(`
+        SELECT column_name FROM information_schema.columns 
+        WHERE table_name = 'ak_banners' AND column_name = 'mobile_image_url'
+      `);
+      if (result.length === 0) {
+        console.error('CRITICAL: mobile_image_url column was DROPPED after startup! Re-adding it...');
+        await dataSource.query('ALTER TABLE "ak_banners" ADD COLUMN IF NOT EXISTS "mobile_image_url" character varying(255) NULL');
+        console.log('Column re-added successfully.');
+      } else {
+        console.log('Post-startup check OK: mobile_image_url column still exists.');
+      }
+    } catch (e) {
+      console.warn('Post-startup check error:', e.message);
+    }
+  }, 5000);
 }
 bootstrap();

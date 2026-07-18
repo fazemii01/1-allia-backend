@@ -41,8 +41,8 @@ import { PartnershipMomentsModule } from './partnership-moments/partnership-mome
         password: config.get<string>('DATABASE_PASS', 'postgres'),
         database: config.get<string>('DATABASE_NAME', 'alliakids_db'),
         autoLoadEntities: true,
-        synchronize: true, // ⚠️ set to false in production; use migrations
-        logging: false,
+        synchronize: true,
+        logging: ['error', 'schema', 'warn'],
       }),
       inject: [ConfigService],
     }),

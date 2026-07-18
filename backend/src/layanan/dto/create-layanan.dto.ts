@@ -92,4 +92,20 @@ export class CreateLayananDto {
   @IsInt()
   @IsOptional()
   sort_order?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  promo_active?: boolean;
+
+  @IsString()
+  @IsOptional()
+  promo_label?: string;
+
+  @IsString()
+  @IsOptional()
+  promo_price?: string;
+
+  @IsString()
+  @IsOptional()
+  promo_ends_at?: string;
 }

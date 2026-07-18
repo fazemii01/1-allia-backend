@@ -59,6 +59,18 @@ export class Layanan {
   @Column({ type: 'int', default: 0 })
   sort_order: number;
 
+  @Column({ type: 'boolean', default: false })
+  promo_active: boolean;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  promo_label: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  promo_price: string;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  promo_ends_at: Date;
+
   @ManyToOne(() => LayananCategory, (cat) => cat.layanan, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'kategori_id' })
   category: LayananCategory;

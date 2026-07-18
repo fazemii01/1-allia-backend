@@ -9,11 +9,18 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { extname } from 'path';
 import { TherapistsService } from './therapists.service';
 import { CreateTherapistDto } from './dto/create-therapist.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { MinioService } from '../shared/minio.service';
 
 @Controller('admin/therapists')
 @UseGuards(JwtAuthGuard)
@@ -21,6 +28,7 @@ export class TherapistsController {
   constructor(
     private readonly therapistsService: TherapistsService,
     private readonly activityLogsService: ActivityLogsService,
+    private readonly minioService: MinioService,
   ) {}
 
   @Get()
@@ -85,5 +93,30 @@ export class TherapistsController {
       userAgent: req.headers['user-agent'],
     });
     return result;
+  }
+
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('image', {
+    storage: memoryStorage(),
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB limit
+    },
+  }))
+  async uploadPhoto(@UploadedFile() file: any, @Request() req: any) {
+    if (!file) {
+      throw new BadRequestException('File tidak boleh kosong!');
+    }
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const filename = `therapist-${uniqueSuffix}${extname(file.originalname)}`;
+    const url = await this.minioService.uploadFile('therapists', filename, file.buffer, file.mimetype);
+    await this.activityLogsService.log({
+      userId: req.user.userId,
+      action: 'upload',
+      description: `Uploaded Therapist photo file: ${file.originalname}`,
+      properties: { url, size: file.size, mime: file.mimetype },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    return { url };
   }
 }

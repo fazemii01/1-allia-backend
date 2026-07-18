@@ -9,6 +9,9 @@ export class Banner {
   image_url: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
+  mobile_image_url: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
   href: string;
 
   @Column({ type: 'int', default: 1 })

@@ -6,6 +6,10 @@ export class CreateBannerDto {
 
   @IsString()
   @IsOptional()
+  mobile_image_url?: string;
+
+  @IsString()
+  @IsOptional()
   href?: string;
 
   @IsInt()

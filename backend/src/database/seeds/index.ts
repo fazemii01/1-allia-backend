@@ -25,6 +25,7 @@ import { PartnershipWhyUs } from '../../partnership-why-us/entities/partnership-
 import { PartnershipCollaboration } from '../../partnership-collaborations/entities/partnership-collaboration.entity';
 import { PartnershipMoment } from '../../partnership-moments/entities/partnership-moment.entity';
 import { Therapist } from '../../therapists/entities/therapist.entity';
+import { Testimonial } from '../../testimonials/entities/testimonial.entity';
 
 const AppDataSource = new DataSource({
   type: 'postgres',
@@ -33,7 +34,7 @@ const AppDataSource = new DataSource({
   username: process.env.DATABASE_USER ?? 'postgres',
   password: process.env.DATABASE_PASS ?? 'postgres',
   database: process.env.DATABASE_NAME ?? 'alliakids_db',
-  entities: [User, LayananCategory, Layanan, WaTemplate, Partnership, PartnershipWhyUs, PartnershipCollaboration, PartnershipMoment, Therapist],
+  entities: [User, LayananCategory, Layanan, WaTemplate, Partnership, PartnershipWhyUs, PartnershipCollaboration, PartnershipMoment, Therapist, Testimonial],
   synchronize: true,
 });
 
@@ -469,6 +470,49 @@ async function runSeeders() {
     }
     await therapistRepo.save(therapistRepo.create(t));
     console.log(`  ✅ Seeded therapist: ${t.name}`);
+  }
+
+  // ── Seed Testimonials ──────────────────────────────────────────────
+  console.log('\n📦 Seeding Testimonials...');
+  const testimonialRepo = AppDataSource.getRepository(Testimonial);
+  const TESTIMONIALS = [
+    {
+      name: 'Ibu Alifah',
+      role: 'Orang Tua dari Alifah (3 Tahun)',
+      message: 'Sangat bersyukur bertemu terapis di Allia Kids. Alifah yang tadinya speech delay berat, sekarang setelah 3 bulan terapi wicara perkembangannya pesat sekali, sudah mulai merangkai kalimat pendek dan komunikatif.',
+      avatar_url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=200',
+      rating: 5,
+      sort_order: 1,
+      is_active: true
+    },
+    {
+      name: 'Bapak Rian',
+      role: 'Orang Tua dari Fatih (5 Tahun)',
+      message: 'Metode hipnoterapi anak di Allia Kids luar biasa membantu mengatasi trauma makan nasi anak saya. Sebelumnya sangat susah makan karbohidrat, sekarang nafsu makannya membaik dan mau makan nasi lagi.',
+      avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=200',
+      rating: 5,
+      sort_order: 2,
+      is_active: true
+    },
+    {
+      name: 'Ibu Nabila',
+      role: 'Orang Tua dari Rayhan (4 Tahun)',
+      message: 'Terapis perilaku sangat sabar membimbing Rayhan yang hiperaktif. Sekarang fokus belajarnya meningkat pesat dan emosinya jauh lebih stabil saat diajak beraktivitas di rumah maupun di sekolah.',
+      avatar_url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=200',
+      rating: 5,
+      sort_order: 3,
+      is_active: true
+    }
+  ];
+
+  for (const t of TESTIMONIALS) {
+    const existing = await testimonialRepo.findOne({ where: { name: t.name } });
+    if (existing) {
+      console.log(`  Skip -> Testimonial from "${t.name}" already exists`);
+      continue;
+    }
+    await testimonialRepo.save(testimonialRepo.create(t));
+    console.log(`  ✅ Seeded testimonial: ${t.name}`);
   }
 
   // ── Seed Users ───────────────────────────────────────────────────

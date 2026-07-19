@@ -24,6 +24,7 @@ import { PartnershipsModule } from './partnerships/partnerships.module';
 import { PartnershipWhyUsModule } from './partnership-why-us/partnership-why-us.module';
 import { PartnershipCollaborationsModule } from './partnership-collaborations/partnership-collaborations.module';
 import { PartnershipMomentsModule } from './partnership-moments/partnership-moments.module';
+import { TestimonialsModule } from './testimonials/testimonials.module';
 
 @Module({
   imports: [
@@ -66,6 +67,7 @@ import { PartnershipMomentsModule } from './partnership-moments/partnership-mome
     PartnershipWhyUsModule,
     PartnershipCollaborationsModule,
     PartnershipMomentsModule,
+    TestimonialsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

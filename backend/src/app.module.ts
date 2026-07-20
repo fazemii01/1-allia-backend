@@ -25,6 +25,7 @@ import { PartnershipWhyUsModule } from './partnership-why-us/partnership-why-us.
 import { PartnershipCollaborationsModule } from './partnership-collaborations/partnership-collaborations.module';
 import { PartnershipMomentsModule } from './partnership-moments/partnership-moments.module';
 import { TestimonialsModule } from './testimonials/testimonials.module';
+import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { TestimonialsModule } from './testimonials/testimonials.module';
     PartnershipCollaborationsModule,
     PartnershipMomentsModule,
     TestimonialsModule,
+    PaymentMethodsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -93,6 +93,22 @@ export class InvoicesController {
     return result;
   }
 
+  @Post(':id/create-pelunasan')
+  async createPelunasan(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const pelunasan = await this.invoicesService.createPelunasanInvoice(id);
+    await this.activityLogsService.log({
+      userId: req.user.userId,
+      action: 'create',
+      modelType: 'Invoice',
+      modelId: String(pelunasan.id),
+      description: `Created Pelunasan 50% Invoice: ${pelunasan.invoice_number} from DP Invoice ID: ${id}`,
+      properties: { parent_invoice_id: id, new: pelunasan },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    return pelunasan;
+  }
+
   @Post(':id/send-whatsapp')
   async sendWhatsApp(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const result = await this.invoicesService.recordWaSent(id);

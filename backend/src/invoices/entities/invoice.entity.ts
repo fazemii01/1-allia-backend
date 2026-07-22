@@ -39,7 +39,16 @@ export class Invoice {
   total_amount: number;
 
   @Column({ type: 'varchar', length: 20, default: 'belum_bayar' })
-  status: string; // belum_bayar | sudah_bayar | jatuh_tempo
+  status: string; // belum_bayar | sudah_bayar | jatuh_tempo | menunggu_verifikasi
+
+  @Column({ type: 'varchar', length: 20, default: 'full' })
+  payment_type: string; // full | dp | pelunasan
+
+  @Column({ type: 'int', nullable: true })
+  parent_invoice_id: number;
+
+  @Column({ type: 'int', nullable: true, default: 50 })
+  dp_percentage: number;
 
   @Column({ type: 'date' })
   due_date: string;

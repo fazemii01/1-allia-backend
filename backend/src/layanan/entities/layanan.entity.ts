@@ -62,6 +62,12 @@ export class Layanan {
   @Column({ type: 'boolean', default: false })
   promo_active: boolean;
 
+  @Column({ type: 'boolean', default: true })
+  allow_dp: boolean;
+
+  @Column({ type: 'int', default: 50 })
+  dp_percentage: number;
+
   @Column({ type: 'varchar', length: 100, nullable: true })
   promo_label: string;
 

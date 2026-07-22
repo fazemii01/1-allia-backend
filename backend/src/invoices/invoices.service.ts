@@ -86,6 +86,41 @@ export class InvoicesService {
     return this.invoiceRepo.save(invoice);
   }
 
+  async createPelunasanInvoice(dpInvoiceId: number): Promise<Invoice> {
+    const dpInvoice = await this.findOne(dpInvoiceId);
+    if (!dpInvoice) throw new NotFoundException(`Invoice DP #${dpInvoiceId} tidak ditemukan`);
+
+    const existingPelunasan = await this.invoiceRepo.findOne({
+      where: { parent_invoice_id: dpInvoice.id, payment_type: 'pelunasan' },
+    });
+    if (existingPelunasan) {
+      return existingPelunasan;
+    }
+
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 7);
+    const dueDateStr = dueDate.toISOString().slice(0, 10);
+
+    const firstItemDesc = dpInvoice.items?.[0]?.description || 'Biaya Terapi';
+    const cleanDesc = firstItemDesc.replace(/Biaya (Pendaftaran & )?DP \d+%\s*/i, '');
+    const desc = `Pelunasan Sisa 50% (${cleanDesc})`;
+
+    return this.create({
+      patient_id: dpInvoice.patient_id,
+      appointment_id: dpInvoice.appointment_id,
+      payment_type: 'pelunasan',
+      parent_invoice_id: dpInvoice.id,
+      dp_percentage: dpInvoice.dp_percentage || 50,
+      items: [
+        {
+          description: desc,
+          amount: Number(dpInvoice.total_amount),
+        },
+      ],
+      due_date: dueDateStr,
+    });
+  }
+
   async recordWaSent(id: number): Promise<Invoice> {
     const invoice = await this.findOne(id);
     invoice.wa_sent_at = new Date();

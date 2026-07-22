@@ -81,23 +81,34 @@ export class ApplyController {
     // Save patient to PostgreSQL via PatientsService
     const patient = await this.patientsService.create(patientDto);
 
-    // Determine registration / assessment fee dynamically
+    // Determine total registration / package fee dynamically
     const isHipo = (payload.jenis_terapi || '').toLowerCase().includes('hipno') || (payload.jenis_terapi || '').toLowerCase().includes('hipot');
-    const amount = isHipo ? 550000 : 150000;
+    const baseFullAmount = payload.total_price ? Number(payload.total_price) : (isHipo ? 550000 : 150000);
+
+    const isDp50 = payload.payment_option === 'dp_50' || payload.payment_type === 'dp_50' || payload.payment_type === 'dp';
+    const invoiceAmount = isDp50 ? Math.round(baseFullAmount * 0.5) : baseFullAmount;
+    const paymentType = isDp50 ? 'dp' : 'full';
 
     // Create due date string 3 days from today
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 3);
     const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-    // Auto-generate invoice
+    // Auto-generate invoice with DP 50% / Full support
     try {
+      const itemTitle = payload.program_detail || payload.jenis_terapi;
+      const desc = isDp50 
+        ? `Biaya DP 50% Pendaftaran & Sesi Terapi (${itemTitle})` 
+        : `Biaya Pendaftaran & Sesi Terapi (${itemTitle})`;
+
       await this.invoicesService.create({
         patient_id: patient.id,
+        payment_type: paymentType,
+        dp_percentage: isDp50 ? 50 : 100,
         items: [
           {
-            description: `Biaya Pendaftaran & Asesmen Awal (${payload.jenis_terapi})`,
-            amount: amount,
+            description: desc,
+            amount: invoiceAmount,
           },
         ],
         due_date: dueDateStr,

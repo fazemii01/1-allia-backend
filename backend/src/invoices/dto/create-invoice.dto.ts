@@ -32,4 +32,16 @@ export class CreateInvoiceDto {
 
   @IsDateString()
   due_date: string;
+
+  @IsString()
+  @IsOptional()
+  payment_type?: string;
+
+  @IsInt()
+  @IsOptional()
+  parent_invoice_id?: number;
+
+  @IsInt()
+  @IsOptional()
+  dp_percentage?: number;
 }

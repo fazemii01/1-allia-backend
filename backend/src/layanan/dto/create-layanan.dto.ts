@@ -97,6 +97,14 @@ export class CreateLayananDto {
   @IsOptional()
   promo_active?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  allow_dp?: boolean;
+
+  @IsInt()
+  @IsOptional()
+  dp_percentage?: number;
+
   @IsString()
   @IsOptional()
   promo_label?: string;

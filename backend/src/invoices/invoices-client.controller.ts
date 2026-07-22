@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, Request, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -8,11 +8,43 @@ import { MinioService } from '../shared/minio.service';
 
 @Controller('invoice')
 export class InvoicesPublicController {
-  constructor(private readonly invoicesService: InvoicesService) {}
+  constructor(
+    private readonly invoicesService: InvoicesService,
+    private readonly minioService: MinioService,
+  ) {}
 
   @Get(':token')
   findByToken(@Param('token') token: string) {
     return this.invoicesService.findByToken(token);
+  }
+
+  @Post(':token/upload-proof-public')
+  @UseInterceptors(
+    FileInterceptor('payment_proof', {
+      storage: memoryStorage(),
+      fileFilter: (req, file, cb) => {
+        if (!file.originalname.match(/\.(jpg|jpeg|png|pdf)$/i)) {
+          return cb(new BadRequestException('Format file harus berupa gambar (jpg, jpeg, png) atau PDF!'), false);
+        }
+        cb(null, true);
+      },
+      limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB
+      },
+    }),
+  )
+  async uploadProofPublic(
+    @Param('token') token: string,
+    @UploadedFile() file: any,
+    @Body('payment_method') paymentMethod?: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File bukti pembayaran tidak boleh kosong!');
+    }
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const filename = `proof-${uniqueSuffix}${extname(file.originalname)}`;
+    const fileUrl = await this.minioService.uploadFile('proofs', filename, file.buffer, file.mimetype);
+    return this.invoicesService.uploadPaymentProofByToken(token, fileUrl, paymentMethod);
   }
 }
 
@@ -49,6 +81,7 @@ export class InvoicesClientController {
   async uploadProof(
     @Param('id') id: string,
     @UploadedFile() file: any,
+    @Body('payment_method') paymentMethod: string,
     @Request() req: any,
   ) {
     if (!file) {
@@ -64,6 +97,6 @@ export class InvoicesClientController {
     // Upload to MinIO
     const fileUrl = await this.minioService.uploadFile('proofs', filename, file.buffer, file.mimetype);
     
-    return this.invoicesService.uploadPaymentProof(Number(id), fileUrl, whatsapp, email);
+    return this.invoicesService.uploadPaymentProof(Number(id), fileUrl, whatsapp, email, paymentMethod);
   }
 }

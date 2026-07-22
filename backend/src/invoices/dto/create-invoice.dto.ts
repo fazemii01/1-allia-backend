@@ -44,4 +44,12 @@ export class CreateInvoiceDto {
   @IsInt()
   @IsOptional()
   dp_percentage?: number;
+
+  @IsNumber()
+  @IsOptional()
+  full_amount?: number;
+
+  @IsString()
+  @IsOptional()
+  payment_method?: string;
 }

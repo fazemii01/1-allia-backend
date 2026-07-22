@@ -155,7 +155,7 @@ export class InvoicesService {
     return query.getMany();
   }
 
-  async uploadPaymentProof(id: number, filePath: string, whatsapp: string, email: string | null): Promise<Invoice> {
+  async uploadPaymentProof(id: number, filePath: string, whatsapp: string, email: string | null, paymentMethod?: string): Promise<Invoice> {
     const invoice = await this.invoiceRepo.createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.patient', 'patient')
       .where('invoice.id = :id', { id })
@@ -171,6 +171,23 @@ export class InvoicesService {
 
     invoice.payment_proof = filePath;
     invoice.status = 'menunggu_verifikasi';
+    if (paymentMethod) {
+      invoice.payment_method = paymentMethod;
+    }
+    return this.invoiceRepo.save(invoice);
+  }
+
+  async uploadPaymentProofByToken(token: string, filePath: string, paymentMethod?: string): Promise<Invoice> {
+    const invoice = await this.findByToken(token);
+    if (!invoice) {
+      throw new NotFoundException(`Invoice dengan token ${token} tidak ditemukan.`);
+    }
+
+    invoice.payment_proof = filePath;
+    invoice.status = 'menunggu_verifikasi';
+    if (paymentMethod) {
+      invoice.payment_method = paymentMethod;
+    }
     return this.invoiceRepo.save(invoice);
   }
 }

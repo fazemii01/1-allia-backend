@@ -38,6 +38,12 @@ export class Invoice {
   @Column({ type: 'decimal', precision: 12, scale: 2 })
   total_amount: number;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  full_amount: number;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, default: 'transfer' })
+  payment_method: string;
+
   @Column({ type: 'varchar', length: 20, default: 'belum_bayar' })
   status: string; // belum_bayar | sudah_bayar | jatuh_tempo | menunggu_verifikasi
 

@@ -105,6 +105,8 @@ export class ApplyController {
         patient_id: patient.id,
         payment_type: paymentType,
         dp_percentage: isDp50 ? 50 : 100,
+        full_amount: baseFullAmount,
+        payment_method: 'transfer',
         items: [
           {
             description: desc,

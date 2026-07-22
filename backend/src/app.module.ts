@@ -26,6 +26,7 @@ import { PartnershipCollaborationsModule } from './partnership-collaborations/pa
 import { PartnershipMomentsModule } from './partnership-moments/partnership-moments.module';
 import { TestimonialsModule } from './testimonials/testimonials.module';
 import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
+import { TherapyProgressModule } from './therapy-progress/therapy-progress.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { PaymentMethodsModule } from './payment-methods/payment-methods.module';
     PartnershipMomentsModule,
     TestimonialsModule,
     PaymentMethodsModule,
+    TherapyProgressModule,
   ],
   controllers: [AppController],
   providers: [AppService],

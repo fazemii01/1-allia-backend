@@ -11,13 +11,16 @@ import { Type } from 'class-transformer';
 
 export class LayananStatsDto {
   @IsString()
-  durasi_sesi: string;
+  @IsOptional()
+  durasi_sesi?: string;
 
   @IsString()
-  format_layanan: string;
+  @IsOptional()
+  format_layanan?: string;
 
   @IsString()
-  mulai_dari: string;
+  @IsOptional()
+  mulai_dari?: string;
 }
 
 export class LayananProgramDto {
@@ -25,10 +28,17 @@ export class LayananProgramDto {
   title: string;
 
   @IsString()
-  desc: string;
+  @IsOptional()
+  desc?: string;
 
   @IsString()
-  harga: string;
+  @IsOptional()
+  harga?: string;
+
+  @IsInt()
+  @IsOptional()
+  @Type(() => Number)
+  total_sesi?: number;
 }
 
 export class CreateLayananCategoryDto {
@@ -45,12 +55,15 @@ export class CreateLayananCategoryDto {
 
   @IsInt()
   @IsOptional()
+  @Type(() => Number)
   sort_order?: number;
 }
 
 export class CreateLayananDto {
   @IsInt()
-  kategori_id: number;
+  @IsOptional()
+  @Type(() => Number)
+  kategori_id?: number;
 
   @IsString()
   title: string;
@@ -83,6 +96,8 @@ export class CreateLayananDto {
 
   @IsArray()
   @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => LayananProgramDto)
   programs?: LayananProgramDto[];
 
   @IsBoolean()
@@ -91,6 +106,7 @@ export class CreateLayananDto {
 
   @IsInt()
   @IsOptional()
+  @Type(() => Number)
   sort_order?: number;
 
   @IsBoolean()
@@ -103,6 +119,7 @@ export class CreateLayananDto {
 
   @IsInt()
   @IsOptional()
+  @Type(() => Number)
   dp_percentage?: number;
 
   @IsString()
@@ -117,3 +134,4 @@ export class CreateLayananDto {
   @IsOptional()
   promo_ends_at?: string;
 }
+

@@ -31,10 +31,11 @@ export class RegisterDto {
   @IsNotEmpty()
   child_name: string;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
   @Max(18)
-  child_age: number;
+  child_age?: number;
 
   @IsString()
   @IsNotEmpty()

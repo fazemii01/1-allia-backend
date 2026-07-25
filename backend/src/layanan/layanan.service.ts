@@ -85,14 +85,18 @@ export class LayananService {
   }
 
   async create(dto: CreateLayananDto): Promise<Layanan> {
-    const slug = dto.slug ?? toSlug(dto.title);
+    const slug = dto.slug && dto.slug.trim() !== '' ? dto.slug : toSlug(dto.title);
     const layanan = this.layananRepo.create({ ...dto, slug });
     return this.layananRepo.save(layanan);
   }
 
   async update(id: number, dto: Partial<CreateLayananDto>): Promise<Layanan> {
     const layanan = await this.findOne(id);
-    Object.assign(layanan, dto);
+    const updatePayload = { ...dto };
+    if (updatePayload.slug !== undefined && updatePayload.slug.trim() === '') {
+      delete updatePayload.slug;
+    }
+    Object.assign(layanan, updatePayload);
     return this.layananRepo.save(layanan);
   }
 

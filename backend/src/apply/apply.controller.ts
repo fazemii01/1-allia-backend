@@ -1,12 +1,14 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { PatientsService } from '../patients/patients.service';
 import { InvoicesService } from '../invoices/invoices.service';
+import { AuthService } from '../auth/auth.service';
 
 @Controller('apply')
 export class ApplyController {
   constructor(
     private readonly patientsService: PatientsService,
     private readonly invoicesService: InvoicesService,
+    private readonly authService: AuthService,
   ) {}
 
   @Post()
@@ -81,6 +83,34 @@ export class ApplyController {
     // Save patient to PostgreSQL via PatientsService
     const patient = await this.patientsService.create(patientDto);
 
+    // Auto register/login user account if password provided
+    let authResult: any = null;
+    if (payload.password) {
+      try {
+        authResult = await this.authService.register({
+          name: payload.nama_ibu || payload.nama_ayah || payload.nama_lengkap,
+          whatsapp: payload.no_telepon,
+          email: payload.email_ortu,
+          password: payload.password,
+          child_name: payload.nama_lengkap,
+          child_age: payload.usia ? Number(payload.usia) : undefined,
+          child_tempat_lahir: payload.tempat_lahir,
+          child_tanggal_lahir: payload.tanggal_lahir,
+          child_jenis_kelamin: payload.jenis_kelamin,
+        });
+      } catch (err) {
+        try {
+          authResult = await this.authService.login({
+            email: payload.email_ortu,
+            whatsapp: payload.no_telepon,
+            password: payload.password,
+          });
+        } catch (loginErr) {
+          console.warn('Auto registration/login during apply skipped:', loginErr.message);
+        }
+      }
+    }
+
     // Determine total registration / package fee dynamically
     const isHipo = (payload.jenis_terapi || '').toLowerCase().includes('hipno') || (payload.jenis_terapi || '').toLowerCase().includes('hipot');
     const baseFullAmount = payload.total_price ? Number(payload.total_price) : (isHipo ? 550000 : 150000);
@@ -123,6 +153,7 @@ export class ApplyController {
       success: true,
       message: 'Formulir pendaftaran berhasil dikirim. Tim kami akan segera menghubungi Anda.',
       patientId: patient.id,
+      auth: authResult,
     };
   }
 }

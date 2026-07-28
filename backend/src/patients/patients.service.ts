@@ -58,26 +58,19 @@ export class PatientsService {
     if (dto.nama_lengkap && dto.no_telepon) {
       const trimmedName = dto.nama_lengkap.trim();
       const trimmedPhone = dto.no_telepon.trim();
+      const targetProgram = dto.jenis_terapi ? dto.jenis_terapi.trim() : '';
+
+      // Check if duplicate patient exists under same parent phone AND same program
       const existing = await this.patientRepo.findOne({
         where: {
           nama_lengkap: ILike(trimmedName),
           no_telepon: trimmedPhone,
+          jenis_terapi: targetProgram ? ILike(targetProgram) : undefined,
         },
       });
 
       if (existing) {
-        // Merge jenis_terapi if new one is different
-        if (dto.jenis_terapi && existing.jenis_terapi !== dto.jenis_terapi) {
-          if (existing.jenis_terapi) {
-            if (!existing.jenis_terapi.includes(dto.jenis_terapi)) {
-              existing.jenis_terapi = `${existing.jenis_terapi}, ${dto.jenis_terapi}`;
-            }
-          } else {
-            existing.jenis_terapi = dto.jenis_terapi;
-          }
-        }
-
-        // Merge questionnaires
+        // Update questionnaires for same program re-submission
         if (dto.formulir_wicara) {
           existing.formulir_wicara = {
             ...(existing.formulir_wicara || {}),
@@ -91,13 +84,13 @@ export class PatientsService {
           };
         }
 
-        // Update other fields
+        // Update demographic fields
         if (dto.usia) existing.usia = dto.usia;
         if (dto.alamat) existing.alamat = dto.alamat;
         if (dto.nama_ayah) existing.nama_ayah = dto.nama_ayah;
         if (dto.nama_ibu) existing.nama_ibu = dto.nama_ibu;
         
-        // Reset status to 'baru' so admin sees the new registration request
+        // Reset status to 'baru' so admin sees the re-registration request
         existing.status = 'baru';
 
         return this.patientRepo.save(existing);

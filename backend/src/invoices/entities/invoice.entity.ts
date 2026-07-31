@@ -56,6 +56,9 @@ export class Invoice {
   @Column({ type: 'int', nullable: true, default: 50 })
   dp_percentage: number;
 
+  @Column({ type: 'int', nullable: true, default: 1 })
+  installment_no: number;
+
   @Column({ type: 'date' })
   due_date: string;
 

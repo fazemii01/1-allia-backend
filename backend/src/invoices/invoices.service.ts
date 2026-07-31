@@ -65,6 +65,7 @@ export class InvoicesService {
       invoice_number: invoiceNumber,
       invoice_token: invoiceToken,
       total_amount: totalAmount,
+      installment_no: dto.installment_no ?? 1,
     });
 
     return this.invoiceRepo.save(invoice);
@@ -83,12 +84,39 @@ export class InvoicesService {
     const invoice = await this.findOne(id);
     invoice.status = 'sudah_bayar';
     invoice.paid_at = new Date();
-    return this.invoiceRepo.save(invoice);
+    const saved = await this.invoiceRepo.save(invoice);
+
+    // Auto-create 2nd installment invoice after first payment is confirmed
+    const isInstallment =
+      saved.payment_type === 'dp' || saved.payment_type === 'custom';
+    const isFirstInvoice = !saved.parent_invoice_id; // not a child invoice itself
+    if (isInstallment && isFirstInvoice) {
+      try {
+        await this.createPelunasanInvoice(saved.id);
+      } catch (e) {
+        // Log but don't fail — pelunasan might already exist
+        console.warn(
+          `Auto-create pelunasan for invoice #${saved.id} skipped:`,
+          e.message,
+        );
+      }
+    }
+
+    return saved;
   }
 
   async createPelunasanInvoice(dpInvoiceId: number): Promise<Invoice> {
     const dpInvoice = await this.findOne(dpInvoiceId);
     if (!dpInvoice) throw new NotFoundException(`Invoice DP #${dpInvoiceId} tidak ditemukan`);
+
+    // Guard: only create if there is a remaining balance
+    const fullAmt = Number(dpInvoice.full_amount) || 0;
+    const paidAmt = Number(dpInvoice.total_amount) || 0;
+    const remainingAmt = fullAmt - paidAmt;
+    if (remainingAmt <= 0) {
+      // No remaining balance — first payment was 100%, skip creating 2nd invoice
+      return dpInvoice;
+    }
 
     const existingPelunasan = await this.invoiceRepo.findOne({
       where: { parent_invoice_id: dpInvoice.id, payment_type: 'pelunasan' },
@@ -101,20 +129,26 @@ export class InvoicesService {
     dueDate.setDate(dueDate.getDate() + 7);
     const dueDateStr = dueDate.toISOString().slice(0, 10);
 
+    // Calculate actual paid/remaining percentages dynamically
+    const paidPercent = dpInvoice.dp_percentage ?? (fullAmt > 0 ? Math.round((paidAmt / fullAmt) * 100) : 50);
+    const remainingPercent = 100 - paidPercent;
+
     const firstItemDesc = dpInvoice.items?.[0]?.description || 'Biaya Terapi';
-    const cleanDesc = firstItemDesc.replace(/Biaya (Pendaftaran & )?DP \d+%\s*/i, '');
-    const desc = `Pelunasan Sisa 50% (${cleanDesc})`;
+    const cleanDesc = firstItemDesc.replace(/Biaya (Pendaftaran & )?(?:DP|Cicilan) \d+%\s*/i, '');
+    const desc = `Cicilan Ke-2 — Pelunasan Sisa ${remainingPercent}% (${cleanDesc})`;
 
     return this.create({
       patient_id: dpInvoice.patient_id,
       appointment_id: dpInvoice.appointment_id,
       payment_type: 'pelunasan',
       parent_invoice_id: dpInvoice.id,
-      dp_percentage: dpInvoice.dp_percentage || 50,
+      dp_percentage: remainingPercent,
+      full_amount: fullAmt,
+      installment_no: 2,
       items: [
         {
           description: desc,
-          amount: Number(dpInvoice.total_amount),
+          amount: remainingAmt,
         },
       ],
       due_date: dueDateStr,

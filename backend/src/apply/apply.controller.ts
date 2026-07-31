@@ -37,6 +37,7 @@ export class ApplyController {
 
     if (isWicara || payload.masalah_bicara || payload.gangguan_utama) {
       patientDto.formulir_wicara = {
+        program_spesifik: payload.program || payload.program_detail,
         masalah_bicara: payload.masalah_bicara,
         sudah_berapa_lama: payload.sudah_berapa_lama_wicara || payload.sudah_berapa_lama,
         dalam_penanganan_lain: payload.dalam_penanganan_lain,
@@ -60,6 +61,7 @@ export class ApplyController {
 
     if (!isWicara || payload.keluhan_utama || payload.penjelasan_keluhan) {
       patientDto.formulir_hipoterapi = {
+        program_spesifik: payload.program || payload.program_detail,
         keluhan_utama: payload.keluhan_utama,
         penjelasan_keluhan: payload.penjelasan_keluhan,
         sudah_berapa_lama: payload.sudah_berapa_lama_hipo || payload.sudah_berapa_lama,
@@ -111,31 +113,60 @@ export class ApplyController {
       }
     }
 
-    // Determine total registration / package fee dynamically
-    const isHipo = (payload.jenis_terapi || '').toLowerCase().includes('hipno') || (payload.jenis_terapi || '').toLowerCase().includes('hipot');
-    const baseFullAmount = payload.total_price ? Number(payload.total_price) : (isHipo ? 550000 : 150000);
+    // Determine total registration / package fee dynamically from payload
+    const baseFullAmount = payload.total_price ? Number(payload.total_price) : 0;
 
     const isDp50 = payload.payment_option === 'dp_50' || payload.payment_type === 'dp_50' || payload.payment_type === 'dp';
-    const invoiceAmount = isDp50 ? Math.round(baseFullAmount * 0.5) : baseFullAmount;
-    const paymentType = isDp50 ? 'dp' : 'full';
+    const isCustom = payload.payment_option === 'custom';
+    const customAmount = isCustom && payload.custom_payment_amount ? Number(payload.custom_payment_amount) : 0;
+
+    let invoiceAmount: number;
+    let paymentType: string;
+    let dpPercentage: number;
+    let installmentNo: number;
+
+    if (isCustom && customAmount > 0) {
+      // Custom amount — could be partial or full
+      invoiceAmount = Math.min(customAmount, baseFullAmount);
+      const isEffectivelyFull = invoiceAmount >= baseFullAmount;
+      paymentType = isEffectivelyFull ? 'full' : 'custom';
+      dpPercentage = isEffectivelyFull ? 100 : Math.round((invoiceAmount / baseFullAmount) * 100);
+      installmentNo = 1;
+    } else if (isDp50) {
+      invoiceAmount = Math.round(baseFullAmount * 0.5);
+      paymentType = 'dp';
+      dpPercentage = 50;
+      installmentNo = 1;
+    } else {
+      invoiceAmount = baseFullAmount;
+      paymentType = 'full';
+      dpPercentage = 100;
+      installmentNo = 1;
+    }
 
     // Create due date string 3 days from today
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 3);
     const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-    // Auto-generate invoice with DP 50% / Full support
+    // Auto-generate invoice with appropriate payment type
     try {
       const itemTitle = payload.program_detail || payload.jenis_terapi;
-      const desc = isDp50 
-        ? `Biaya DP 50% Pendaftaran & Sesi Terapi (${itemTitle})` 
-        : `Biaya Pendaftaran & Sesi Terapi (${itemTitle})`;
+      let desc: string;
+      if (paymentType === 'custom') {
+        desc = `Cicilan Ke-1 \u2014 ${dpPercentage}% Pendaftaran & Sesi Terapi (${itemTitle})`;
+      } else if (paymentType === 'dp') {
+        desc = `Biaya DP 50% Pendaftaran & Sesi Terapi (${itemTitle})`;
+      } else {
+        desc = `Biaya Pendaftaran & Sesi Terapi (${itemTitle})`;
+      }
 
       await this.invoicesService.create({
         patient_id: patient.id,
         payment_type: paymentType,
-        dp_percentage: isDp50 ? 50 : 100,
+        dp_percentage: dpPercentage,
         full_amount: baseFullAmount,
+        installment_no: installmentNo,
         payment_method: 'transfer',
         items: [
           {

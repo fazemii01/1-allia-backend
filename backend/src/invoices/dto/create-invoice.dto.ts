@@ -49,6 +49,10 @@ export class CreateInvoiceDto {
   @IsOptional()
   full_amount?: number;
 
+  @IsInt()
+  @IsOptional()
+  installment_no?: number;
+
   @IsString()
   @IsOptional()
   payment_method?: string;

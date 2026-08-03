@@ -197,10 +197,13 @@ export class WhatsAppWebhookController {
         text = String(data.text || data.message);
       } else {
         // Baileys / standard WhatsApp message structure
-        const msg = Array.isArray(data?.messages) ? data.messages[0] : data?.messages || data?.message;
-        if (msg && !msg?.key?.fromMe && !msg?.fromMe) {
-          const remoteJid: string = msg?.key?.remoteJid || msg?.from || msg?.sender || '';
-          if (!remoteJid.endsWith('@g.us') && !remoteJid.includes('broadcast')) {
+        const msg = Array.isArray(data?.messages) ? data.messages[0] : data?.messages || data?.message || data;
+        
+        // Skip messages sent BY the bot itself to prevent infinite auto-reply loops
+        const isFromMe = msg?.key?.fromMe ?? msg?.fromMe ?? false;
+        if (!isFromMe) {
+          const remoteJid: string = msg?.key?.remoteJid || msg?.from || msg?.sender || data?.from || '';
+          if (remoteJid && !remoteJid.endsWith('@g.us') && !remoteJid.includes('broadcast')) {
             from = remoteJid.replace(/@.*$/, '');
             text =
               msg?.message?.conversation ||
@@ -208,6 +211,7 @@ export class WhatsAppWebhookController {
               msg?.messageBody ||
               msg?.body ||
               msg?.text ||
+              data?.text ||
               '';
           }
         }
@@ -217,7 +221,7 @@ export class WhatsAppWebhookController {
         this.logger.log(`Processing inbound WA from ${from}: "${text}"`);
         await this.whatsappService.handleInbound(from, text);
       } else {
-        this.logger.debug(`Webhook received event "${event}" with no inbound message text.`);
+        this.logger.log(`Webhook event "${event}" received (no new inbound message text).`);
       }
     } catch (err: any) {
       this.logger.error(`Webhook handling error (${event}): ${err?.message}`);

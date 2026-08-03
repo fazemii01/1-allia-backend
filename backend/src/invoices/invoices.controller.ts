@@ -15,6 +15,7 @@ import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 @Controller('admin/invoices')
 @UseGuards(JwtAuthGuard)
@@ -22,6 +23,7 @@ export class InvoicesController {
   constructor(
     private readonly invoicesService: InvoicesService,
     private readonly activityLogsService: ActivityLogsService,
+    private readonly whatsappService: WhatsAppService,
   ) {}
 
   @Get()
@@ -52,6 +54,26 @@ export class InvoicesController {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    try {
+      const full = await this.invoicesService.findOne(invoice.id);
+      const patient = full.patient;
+      const phone = patient?.no_telepon;
+      if (phone) {
+        const firstItem = full.items?.[0];
+        await this.whatsappService.sendByTrigger('invoice_created', phone, {
+          nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+          nama_anak: patient?.nama_lengkap || '',
+          invoice_number: full.invoice_number,
+          layanan: firstItem?.description || '',
+          total_amount: Number(full.total_amount).toLocaleString('id-ID'),
+          due_date: full.due_date,
+        }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+      }
+    } catch (e) {
+      console.warn('WA invoice_created notification skipped:', e);
+    }
+
     return invoice;
   }
 
@@ -90,6 +112,23 @@ export class InvoicesController {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    try {
+      const full = await this.invoicesService.findOne(id);
+      const patient = full.patient;
+      const phone = patient?.no_telepon;
+      if (phone) {
+        await this.whatsappService.sendByTrigger('payment_received', phone, {
+          nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+          nama_anak: patient?.nama_lengkap || '',
+          invoice_number: full.invoice_number,
+          total_amount: Number(full.total_amount).toLocaleString('id-ID'),
+        }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+      }
+    } catch (e) {
+      console.warn('WA payment_received notification skipped:', e);
+    }
+
     return result;
   }
 
@@ -111,17 +150,34 @@ export class InvoicesController {
 
   @Post(':id/send-whatsapp')
   async sendWhatsApp(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const full = await this.invoicesService.findOne(id);
+    const patient = full.patient;
+    const phone = patient?.no_telepon;
+    let waResult: any = null;
+
+    if (phone) {
+      const firstItem = full.items?.[0];
+      waResult = await this.whatsappService.sendByTrigger('invoice_created', phone, {
+        nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+        nama_anak: patient?.nama_lengkap || '',
+        invoice_number: full.invoice_number,
+        layanan: firstItem?.description || '',
+        total_amount: Number(full.total_amount).toLocaleString('id-ID'),
+        due_date: full.due_date,
+      }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+    }
+
     const result = await this.invoicesService.recordWaSent(id);
     await this.activityLogsService.log({
       userId: req.user.userId,
       action: 'whatsapp',
       modelType: 'Invoice',
       modelId: String(id),
-      description: `Sent Invoice WhatsApp Notification for Invoice ID: ${id}`,
+      description: `Sent Invoice WhatsApp Notification for Invoice ID: ${id} (${full.invoice_number})`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    return result;
+    return { invoice: result, whatsapp: waResult };
   }
 
   @Delete(':id')

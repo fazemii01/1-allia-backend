@@ -2,6 +2,7 @@ import { Controller, Post, Body } from '@nestjs/common';
 import { PatientsService } from '../patients/patients.service';
 import { InvoicesService } from '../invoices/invoices.service';
 import { AuthService } from '../auth/auth.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 @Controller('apply')
 export class ApplyController {
@@ -9,6 +10,7 @@ export class ApplyController {
     private readonly patientsService: PatientsService,
     private readonly invoicesService: InvoicesService,
     private readonly authService: AuthService,
+    private readonly whatsappService: WhatsAppService,
   ) {}
 
   @Post()
@@ -178,6 +180,21 @@ export class ApplyController {
       });
     } catch (e) {
       console.warn('Invoice generation skipped or failed:', e);
+    }
+
+    // Auto-send registration confirmation WA (only if a template with trigger apply_created + auto_send is active)
+    try {
+      if (payload.no_telepon) {
+        await this.whatsappService.sendByTrigger('apply_created', payload.no_telepon, {
+          nama_ortu: payload.nama_ibu || payload.nama_ayah || 'Bapak/Ibu',
+          nama_anak: payload.nama_lengkap,
+          usia: payload.usia,
+          jenis_terapi: payload.jenis_terapi,
+          tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+        }, { patient_id: patient.id, patient_name: payload.nama_lengkap });
+      }
+    } catch (e) {
+      console.warn('WA apply_created notification skipped:', e);
     }
 
     return {

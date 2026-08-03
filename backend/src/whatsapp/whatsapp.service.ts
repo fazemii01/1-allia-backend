@@ -1,8 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WaLog } from './entities/wa-log.entity';
 import { WaTemplate } from './entities/wa-template.entity';
+import { WaAutoReply } from './entities/wa-auto-reply.entity';
+import { WaSenderService } from './wasender.service';
 
 export interface SaveLogDto {
   patient_id?: number;
@@ -15,11 +17,16 @@ export interface SaveLogDto {
 
 @Injectable()
 export class WhatsAppService {
+  private readonly logger = new Logger(WhatsAppService.name);
+
   constructor(
     @InjectRepository(WaLog)
     private readonly logRepo: Repository<WaLog>,
     @InjectRepository(WaTemplate)
     private readonly templateRepo: Repository<WaTemplate>,
+    @InjectRepository(WaAutoReply)
+    private readonly autoReplyRepo: Repository<WaAutoReply>,
+    private readonly wasender: WaSenderService,
   ) {}
 
   findAllLogs(patientId?: number): Promise<WaLog[]> {
@@ -35,14 +42,148 @@ export class WhatsAppService {
     return this.logRepo.save(log);
   }
 
+  async sendAndLog(dto: SaveLogDto): Promise<{ log: WaLog; sent: boolean; error?: string }> {
+    const result = await this.wasender.sendMessage(dto.recipient, dto.body);
+    const log = await this.saveLog({
+      ...dto,
+      status: result.ok ? 'sent' : 'failed',
+    });
+    return { log, sent: result.ok, error: result.error };
+  }
+
+  // ── Templates ──────────────────────────────────────────────────────
+
   findAllTemplates(): Promise<WaTemplate[]> {
     return this.templateRepo.find({ order: { id: 'ASC' } });
   }
 
-  async updateTemplate(id: string, body: string): Promise<WaTemplate> {
+  createTemplate(data: Partial<WaTemplate>): Promise<WaTemplate> {
+    const id = data.id || (data.name ? data.name.toLowerCase().replace(/\s+/g, '_') : `template_${Date.now()}`);
+    const tpl = this.templateRepo.create({
+      id,
+      name: data.name || id,
+      body: data.body || '',
+      trigger_event: data.trigger_event || null,
+      auto_send: data.auto_send ?? false,
+      is_active: data.is_active ?? true,
+    });
+    return this.templateRepo.save(tpl);
+  }
+
+  async updateTemplate(
+    id: string,
+    body: string,
+    extras?: { trigger_event?: string | null; auto_send?: boolean; is_active?: boolean; name?: string },
+  ): Promise<WaTemplate> {
+    let tpl = await this.templateRepo.findOne({ where: { id } });
+    if (!tpl) {
+      // Upsert: create template if ID does not exist
+      tpl = this.templateRepo.create({ id, name: extras?.name || id, body });
+    }
+    tpl.body = body;
+    if (extras?.name !== undefined) tpl.name = extras.name;
+    if (extras?.trigger_event !== undefined) tpl.trigger_event = extras.trigger_event;
+    if (extras?.auto_send !== undefined) tpl.auto_send = extras.auto_send;
+    if (extras?.is_active !== undefined) tpl.is_active = extras.is_active;
+    return this.templateRepo.save(tpl);
+  }
+
+  async deleteTemplate(id: string): Promise<void> {
     const tpl = await this.templateRepo.findOne({ where: { id } });
     if (!tpl) throw new NotFoundException(`Template "${id}" not found`);
-    tpl.body = body;
-    return this.templateRepo.save(tpl);
+    await this.templateRepo.remove(tpl);
+  }
+
+  renderTemplate(body: string, vars: Record<string, any>): string {
+    return body.replace(/\{(\w+)\}/g, (_, key) => {
+      const val = vars[key];
+      return val === undefined || val === null ? '' : String(val);
+    });
+  }
+
+  private readonly defaultTemplates: Record<string, string> = {
+    apply_created: 'Halo {nama_ortu}, terima kasih telah mendaftar di Allia Kids untuk Ananda {nama_anak} ({jenis_terapi}). Formulir pendaftaran telah kami terima dan tim kami akan segera menghubungi Anda.',
+    invoice_created: 'Halo {nama_ortu}, tagihan invoice #{invoice_number} sebesar Rp {total_amount} untuk Ananda {nama_anak} ({layanan}) telah diterbitkan. Jatuh tempo: {due_date}. Terima kasih.',
+    payment_received: 'Halo {nama_ortu}, pembayaran tagihan invoice #{invoice_number} untuk Ananda {nama_anak} sebesar Rp {total_amount} telah kami terima dan diverifikasi. Terima kasih!',
+  };
+
+  async sendByTrigger(
+    triggerEvent: string,
+    recipient: string,
+    vars: Record<string, any>,
+    meta?: { patient_id?: number; patient_name?: string },
+  ): Promise<{ sent: boolean; template_id?: string; error?: string }> {
+    const tpl = await this.templateRepo.findOne({
+      where: { trigger_event: triggerEvent, auto_send: true, is_active: true },
+    });
+
+    let templateBody = tpl?.body;
+    if (!templateBody && this.defaultTemplates[triggerEvent]) {
+      templateBody = this.defaultTemplates[triggerEvent];
+    }
+
+    if (!templateBody) return { sent: false, error: `No template found for trigger: ${triggerEvent}` };
+
+    const body = this.renderTemplate(templateBody, vars);
+    const result = await this.sendAndLog({
+      patient_id: meta?.patient_id,
+      recipient,
+      patient_name: meta?.patient_name,
+      type: triggerEvent,
+      body,
+    });
+    return { sent: result.sent, template_id: tpl?.id, error: result.error };
+  }
+
+  // ── Auto-reply rules ───────────────────────────────────────────────
+
+  findAllAutoReplies(): Promise<WaAutoReply[]> {
+    return this.autoReplyRepo.find({ order: { id: 'ASC' } });
+  }
+
+  createAutoReply(data: Partial<WaAutoReply>): Promise<WaAutoReply> {
+    return this.autoReplyRepo.save(this.autoReplyRepo.create(data));
+  }
+
+  async updateAutoReply(id: number, data: Partial<WaAutoReply>): Promise<WaAutoReply> {
+    const rule = await this.autoReplyRepo.findOne({ where: { id } });
+    if (!rule) throw new NotFoundException(`Auto-reply #${id} not found`);
+    Object.assign(rule, data);
+    return this.autoReplyRepo.save(rule);
+  }
+
+  async deleteAutoReply(id: number): Promise<void> {
+    const rule = await this.autoReplyRepo.findOne({ where: { id } });
+    if (!rule) throw new NotFoundException(`Auto-reply #${id} not found`);
+    await this.autoReplyRepo.remove(rule);
+  }
+
+  // ── Inbound handling ───────────────────────────────────────────────
+
+  async handleInbound(from: string, text: string): Promise<void> {
+    const recipient = this.wasender.normalizeMsisdn(from);
+    await this.saveLog({
+      recipient,
+      type: 'inbound',
+      body: text,
+      status: 'received',
+    });
+
+    const rules = await this.autoReplyRepo.find({ where: { is_active: true } });
+    const normalized = (text || '').trim().toLowerCase();
+    if (!normalized) return;
+
+    const matched =
+      rules.find((r) => r.keyword !== '*' && r.match_type === 'exact' && normalized === r.keyword.toLowerCase()) ||
+      rules.find((r) => r.keyword !== '*' && r.match_type !== 'exact' && normalized.includes(r.keyword.toLowerCase())) ||
+      rules.find((r) => r.keyword === '*');
+
+    if (!matched) return;
+
+    await this.sendAndLog({
+      recipient,
+      type: 'auto_reply',
+      body: matched.reply_body,
+    });
   }
 }

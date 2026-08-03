@@ -172,6 +172,60 @@ export class WhatsAppController {
   }
 }
 
+function extractSenderPhone(payload: any, data: any, msg: any): string {
+  const candidates: string[] = [
+    payload?.phone,
+    payload?.senderPhone,
+    payload?.recipient,
+    data?.phone,
+    data?.senderPhone,
+    data?.recipient,
+    msg?.key?.remoteJidAlt,
+    msg?.senderPn,
+    msg?.participantPn,
+    msg?.key?.participant,
+    msg?.key?.remoteJid,
+    msg?.from,
+    msg?.sender,
+    data?.from,
+    payload?.from,
+  ].filter(Boolean).map(String);
+
+  // 1. High priority: Check for JID ending with @s.whatsapp.net
+  for (const c of candidates) {
+    if (c.includes('@s.whatsapp.net')) {
+      return c.replace(/@.*$/, '');
+    }
+  }
+
+  // 2. High priority: Check for standard phone numbers (starts with 628, 08, or +628)
+  for (const c of candidates) {
+    const digits = c.replace(/\D/g, '');
+    if ((digits.startsWith('628') || digits.startsWith('08')) && digits.length >= 10 && digits.length <= 14) {
+      return digits;
+    }
+  }
+
+  // 3. Regex scan over payload JSON string for phone number pattern 628... or 08...
+  try {
+    const jsonStr = JSON.stringify({ payload, data, msg });
+    const match = jsonStr.match(/(?:628|08)\d{8,12}/);
+    if (match) return match[0];
+  } catch (e) {}
+
+  // 4. Fallback: Return first candidate that is not a LID (@lid) or group (@g.us)
+  for (const c of candidates) {
+    if (!c.endsWith('@lid') && !c.endsWith('@g.us') && !c.includes('broadcast')) {
+      const clean = c.replace(/@.*$/, '');
+      if (!clean.startsWith('19') || clean.length < 14) {
+        return clean;
+      }
+    }
+  }
+
+  return '';
+}
+
 @Controller('whatsapp')
 export class WhatsAppWebhookController {
   private readonly logger = new Logger(WhatsAppWebhookController.name);
@@ -188,40 +242,27 @@ export class WhatsAppWebhookController {
       let from = '';
       let text = '';
 
-      // Direct format: { from: "628...", text: "halo" }
-      if (payload?.from && (payload?.text || payload?.message)) {
-        from = String(payload.from).replace(/@.*$/, '');
-        text = String(payload.text || payload.message);
-      } else if (data?.from && (data?.text || data?.message)) {
-        from = String(data.from).replace(/@.*$/, '');
-        text = String(data.text || data.message);
-      } else {
-        // Baileys / standard WhatsApp message structure
-        const msg = Array.isArray(data?.messages) ? data.messages[0] : data?.messages || data?.message || data;
-        
-        // Skip messages sent BY the bot itself to prevent infinite auto-reply loops
-        const isFromMe = msg?.key?.fromMe ?? msg?.fromMe ?? false;
-        if (!isFromMe) {
-          const remoteJid: string = msg?.key?.remoteJid || msg?.from || msg?.sender || data?.from || '';
-          if (remoteJid && !remoteJid.endsWith('@g.us') && !remoteJid.includes('broadcast')) {
-            from = remoteJid.replace(/@.*$/, '');
-            text =
-              msg?.message?.conversation ||
-              msg?.message?.extendedTextMessage?.text ||
-              msg?.messageBody ||
-              msg?.body ||
-              msg?.text ||
-              data?.text ||
-              '';
-          }
-        }
+      const msg = Array.isArray(data?.messages) ? data.messages[0] : data?.messages || data?.message || data;
+      const isFromMe = msg?.key?.fromMe ?? msg?.fromMe ?? payload?.fromMe ?? false;
+
+      if (!isFromMe) {
+        from = extractSenderPhone(payload, data, msg);
+        text =
+          msg?.message?.conversation ||
+          msg?.message?.extendedTextMessage?.text ||
+          msg?.messageBody ||
+          msg?.body ||
+          msg?.text ||
+          data?.text ||
+          payload?.text ||
+          '';
       }
 
       if (from && text) {
         this.logger.log(`Processing inbound WA from ${from}: "${text}"`);
         await this.whatsappService.handleInbound(from, text);
       } else {
-        this.logger.log(`Webhook event "${event}" received (no new inbound message text).`);
+        this.logger.log(`Webhook event "${event}" received (no valid non-LID sender or text found).`);
       }
     } catch (err: any) {
       this.logger.error(`Webhook handling error (${event}): ${err?.message}`);

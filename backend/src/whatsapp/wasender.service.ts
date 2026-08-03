@@ -17,6 +17,13 @@ export class WaSenderService {
   normalizeMsisdn(phone: string): string {
     let digits = (phone || '').replace(/\D/g, '');
     if (!digits) return '';
+
+    // Filter out WhatsApp LIDs (e.g., 15+ digits starting with '19', like 190829859745794)
+    if (digits.length >= 15 && digits.startsWith('19')) {
+      this.logger.warn(`Skipping invalid phone number (detected WhatsApp LID: "${digits}")`);
+      return '';
+    }
+
     if (digits.startsWith('620')) {
       digits = `62${digits.slice(3)}`;
     } else if (digits.startsWith('0')) {

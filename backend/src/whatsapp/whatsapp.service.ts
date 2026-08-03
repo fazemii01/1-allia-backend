@@ -162,6 +162,11 @@ export class WhatsAppService {
 
   async handleInbound(from: string, text: string): Promise<void> {
     const recipient = this.wasender.normalizeMsisdn(from);
+    if (!recipient) {
+      this.logger.warn(`Skipping handleInbound for invalid recipient (from: "${from}")`);
+      return;
+    }
+
     await this.saveLog({
       recipient,
       type: 'inbound',

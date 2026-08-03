@@ -2,6 +2,14 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Minio from 'minio';
 
+export function normalizeStorageUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  return url
+    .replace(/^http:\/\/194\.233\.91\.132:\d+/i, 'https://storage.alliago.id')
+    .replace(/^http:\/\/storage\.alliago\.id/i, 'https://storage.alliago.id')
+    .replace(/^http:\/\//i, 'https://');
+}
+
 @Injectable()
 export class MinioService implements OnModuleInit {
   private readonly logger = new Logger(MinioService.name);
@@ -11,7 +19,7 @@ export class MinioService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   async onModuleInit() {
-    let endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
+    let endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'storage.alliago.id');
     let port = parseInt(this.configService.get<string>('MINIO_PORT', '9000'), 10);
 
     if (endPoint.includes(':')) {
@@ -79,24 +87,11 @@ export class MinioService implements OnModuleInit {
 
       this.logger.log(`Uploaded file ${objectName} to bucket ${this.bucketName}`);
 
-      // Return the public URL
-      let endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
-      let port = this.configService.get<string>('MINIO_PORT', '9000');
-      
-      if (endPoint.includes(':')) {
-        const parts = endPoint.split(':');
-        endPoint = parts[0];
-        port = parts[1];
-      }
+      let endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'storage.alliago.id');
+      const host = endPoint.includes(':') ? endPoint.split(':')[0] : endPoint;
 
-      const useSSL = this.configService.get<string>('MINIO_SECURE', 'false') === 'true' || 
-                     this.configService.get<string>('MINIO_USE_SSL', 'false') === 'true';
-      const protocol = useSSL ? 'https' : 'http';
-      
-      const rawUrl = `${protocol}://${endPoint}:${port}/${this.bucketName}/${cleanFolder}/${filename}`;
-      return rawUrl
-        .replace('http://194.233.91.132:19000', 'https://storage.alliago.id')
-        .replace('http://storage.alliago.id', 'https://storage.alliago.id');
+      const rawUrl = `https://${host}/${this.bucketName}/${cleanFolder}/${filename}`;
+      return normalizeStorageUrl(rawUrl);
     } catch (err: any) {
       this.logger.error(`Failed to upload file to MinIO: ${err.message}`, err.stack);
       throw err;

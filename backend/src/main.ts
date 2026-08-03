@@ -44,6 +44,21 @@ async function bootstrap() {
       'ALTER TABLE "ak_appointments" ALTER COLUMN "therapist_id" DROP NOT NULL'
     );
     console.log('Schema ensured: ak_appointments.therapist_id is nullable');
+
+    // Auto-migrate legacy MinIO HTTP IP URLs to HTTPS storage.alliago.id
+    await dataSource.query(`
+      UPDATE "ak_therapists" 
+      SET photo_url = REPLACE(REPLACE(photo_url, 'http://194.233.91.132:19000', 'https://storage.alliago.id'), 'http://storage.alliago.id', 'https://storage.alliago.id') 
+      WHERE photo_url LIKE '%194.233.91.132%' OR photo_url LIKE 'http://storage.alliago.id%'
+    `);
+    await dataSource.query(`
+      UPDATE "ak_banners" 
+      SET image_url = REPLACE(REPLACE(image_url, 'http://194.233.91.132:19000', 'https://storage.alliago.id'), 'http://storage.alliago.id', 'https://storage.alliago.id'),
+          mobile_image_url = REPLACE(REPLACE(mobile_image_url, 'http://194.233.91.132:19000', 'https://storage.alliago.id'), 'http://storage.alliago.id', 'https://storage.alliago.id')
+      WHERE image_url LIKE '%194.233.91.132%' OR image_url LIKE 'http://storage.alliago.id%'
+         OR mobile_image_url LIKE '%194.233.91.132%' OR mobile_image_url LIKE 'http://storage.alliago.id%'
+    `);
+    console.log('Schema & URLs ensured: Migrated legacy MinIO HTTP IP URLs to https://storage.alliago.id');
   } catch (err) {
     console.warn('Schema migration warning:', err.message);
   }

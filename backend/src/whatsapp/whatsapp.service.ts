@@ -173,13 +173,22 @@ export class WhatsAppService {
     const normalized = (text || '').trim().toLowerCase();
     if (!normalized) return;
 
-    const matched =
-      rules.find((r) => r.keyword !== '*' && r.match_type === 'exact' && normalized === r.keyword.toLowerCase()) ||
-      rules.find((r) => r.keyword !== '*' && r.match_type !== 'exact' && normalized.includes(r.keyword.toLowerCase())) ||
-      rules.find((r) => r.keyword === '*');
+    // Rule matcher logic:
+    // Supports comma-separated keywords (e.g., "halo, permisi, min")
+    const matched = rules.find((r) => {
+      if (r.keyword === '*') return false; // fallback handled later
+      const keywords = r.keyword.split(',').map((k) => k.trim().toLowerCase()).filter(Boolean);
+      if (r.match_type === 'exact') {
+        return keywords.some((kw) => normalized === kw);
+      } else {
+        // 'contains' mode: matches if incoming message contains keyword OR keyword contains incoming message
+        return keywords.some((kw) => normalized.includes(kw) || kw.includes(normalized));
+      }
+    }) || rules.find((r) => r.keyword === '*');
 
     if (!matched) return;
 
+    this.logger.log(`Matched auto-reply rule #${matched.id} (keyword: "${matched.keyword}") for recipient ${recipient}`);
     await this.sendAndLog({
       recipient,
       type: 'auto_reply',

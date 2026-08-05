@@ -112,6 +112,61 @@ export class WhatsAppController {
     return result;
   }
 
+  @Post('trigger-test')
+  async triggerTest(
+    @Body() payload: { trigger_event: string; phone?: string; recipient?: string; vars?: Record<string, any> },
+    @Request() req: any,
+  ) {
+    const recipient = payload.recipient || payload.phone || '082123581796';
+    const trigger = payload.trigger_event;
+    
+    const sampleVars: Record<string, Record<string, any>> = {
+      apply_created: {
+        nama_ortu: 'Ibu Maya',
+        nama_anak: 'Ananda Budi',
+        jenis_terapi: 'Terapi Wicara',
+      },
+      invoice_created: {
+        nama_ortu: 'Ibu Maya',
+        nama_anak: 'Ananda Budi',
+        invoice_number: 'INV-202608-001',
+        total_amount: '350.000',
+        layanan: 'Paket Terapi Wicara 4 Sesi',
+        due_date: '10 Agustus 2026',
+      },
+      session_reminder: {
+        nama_ortu: 'Ibu Maya',
+        nama_anak: 'Ananda Budi',
+        jenis_terapi: 'Terapi Wicara',
+        tanggal_sesi: 'Rabu, 5 Agustus 2026',
+        jam_sesi: '14:00 WIB',
+        nama_terapis: 'Siti Rahma, S.Tr.Kes',
+      },
+      payment_received: {
+        nama_ortu: 'Ibu Maya',
+        nama_anak: 'Ananda Budi',
+        invoice_number: 'INV-202608-001',
+        total_amount: '350.000',
+      },
+    };
+
+    const vars = payload.vars || sampleVars[trigger] || { nama_ortu: 'Ibu Maya', nama_anak: 'Ananda Budi' };
+    const res = await this.whatsappService.sendByTrigger(trigger, recipient, vars, { patient_name: 'Ananda Budi' });
+    
+    await this.activityLogsService.log({
+      userId: req?.user?.userId,
+      action: 'whatsapp',
+      modelType: 'WaLog',
+      modelId: String(trigger),
+      description: `Test Triggered WA Template "${trigger}" to ${recipient}`,
+      properties: { recipient, trigger, vars, result: res },
+      ipAddress: req?.ip,
+      userAgent: req?.headers?.['user-agent'],
+    });
+
+    return res;
+  }
+
   @Get('auto-replies')
   getAutoReplies() {
     return this.whatsappService.findAllAutoReplies();

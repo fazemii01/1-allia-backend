@@ -104,6 +104,7 @@ export class WhatsAppService {
   private readonly defaultTemplates: Record<string, string> = {
     apply_created: 'Halo {nama_ortu}, terima kasih telah mendaftar di Allia Kids untuk Ananda {nama_anak} ({jenis_terapi}). Formulir pendaftaran telah kami terima dan tim kami akan segera menghubungi Anda.',
     invoice_created: 'Halo {nama_ortu}, tagihan invoice #{invoice_number} sebesar Rp {total_amount} untuk Ananda {nama_anak} ({layanan}) telah diterbitkan. Jatuh tempo: {due_date}. Terima kasih.',
+    session_reminder: 'Halo {nama_ortu}, pengingat jadwal sesi terapi Ananda {nama_anak} ({jenis_terapi}) pada {tanggal_sesi} pukul {jam_sesi} bersama Terapis {nama_terapis}. Mohon hadir 10 menit sebelum sesi dimulai. Terima kasih.',
     payment_received: 'Halo {nama_ortu}, pembayaran tagihan invoice #{invoice_number} untuk Ananda {nama_anak} sebesar Rp {total_amount} telah kami terima dan diverifikasi. Terima kasih!',
   };
 

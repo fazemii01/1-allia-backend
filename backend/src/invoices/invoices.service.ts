@@ -80,6 +80,20 @@ export class InvoicesService {
     return invoice;
   }
 
+  async findPublicByCode(code: string): Promise<Invoice> {
+    const isNum = !isNaN(Number(code));
+    const invoice = await this.invoiceRepo.findOne({
+      where: [
+        { invoice_token: code },
+        { invoice_number: code },
+        ...(isNum ? [{ id: Number(code) }] : []),
+      ],
+      relations: { patient: true, appointment: true },
+    });
+    if (!invoice) throw new NotFoundException(`Invoice "${code}" tidak ditemukan`);
+    return invoice;
+  }
+
   async markPaid(id: number): Promise<Invoice> {
     const invoice = await this.findOne(id);
     invoice.status = 'sudah_bayar';

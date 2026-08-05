@@ -197,3 +197,13 @@ export class InvoicesController {
     return result;
   }
 }
+
+@Controller('public/invoices')
+export class PublicInvoicesController {
+  constructor(private readonly invoicesService: InvoicesService) {}
+
+  @Get(':code')
+  findPublicByCode(@Param('code') code: string) {
+    return this.invoicesService.findPublicByCode(code);
+  }
+}

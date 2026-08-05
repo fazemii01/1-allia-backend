@@ -151,7 +151,7 @@ export class ApplyController {
     dueDate.setDate(dueDate.getDate() + 3);
     const dueDateStr = dueDate.toISOString().slice(0, 10);
 
-    // Auto-generate invoice with appropriate payment type
+    let createdInvoice: any = null;
     try {
       const itemTitle = payload.program_detail || payload.jenis_terapi;
       let desc: string;
@@ -163,7 +163,7 @@ export class ApplyController {
         desc = `Biaya Pendaftaran & Sesi Terapi (${itemTitle})`;
       }
 
-      await this.invoicesService.create({
+      createdInvoice = await this.invoicesService.create({
         patient_id: patient.id,
         payment_type: paymentType,
         dp_percentage: dpPercentage,
@@ -182,19 +182,40 @@ export class ApplyController {
       console.warn('Invoice generation skipped or failed:', e);
     }
 
-    // Auto-send registration confirmation WA (only if a template with trigger apply_created + auto_send is active)
+    // Auto-send registration & invoice WA notifications
     try {
       if (payload.no_telepon) {
+        const invToken = createdInvoice?.invoice_token || createdInvoice?.invoice_number || createdInvoice?.id || '';
+        const invoiceLink = invToken ? `https://app.alliakids.com/invoice/${invToken}` : '';
+
+        // 1. Trigger apply_created
         await this.whatsappService.sendByTrigger('apply_created', payload.no_telepon, {
           nama_ortu: payload.nama_ibu || payload.nama_ayah || 'Bapak/Ibu',
           nama_anak: payload.nama_lengkap,
-          usia: payload.usia,
-          jenis_terapi: payload.jenis_terapi,
+          usia: payload.usia || '-',
+          jenis_terapi: payload.jenis_terapi || '-',
           tanggal: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
+          link_invoice: invoiceLink,
+          invoice_number: createdInvoice?.invoice_number || '',
+          total_amount: createdInvoice ? Number(createdInvoice.total_amount).toLocaleString('id-ID') : '',
         }, { patient_id: patient.id, patient_name: payload.nama_lengkap });
+
+        // 2. Trigger invoice_created at the same time if invoice was created
+        if (createdInvoice) {
+          const firstItem = createdInvoice.items?.[0];
+          await this.whatsappService.sendByTrigger('invoice_created', payload.no_telepon, {
+            nama_ortu: payload.nama_ibu || payload.nama_ayah || 'Bapak/Ibu',
+            nama_anak: payload.nama_lengkap,
+            invoice_number: createdInvoice.invoice_number,
+            layanan: firstItem?.description || payload.jenis_terapi || '',
+            total_amount: Number(createdInvoice.total_amount).toLocaleString('id-ID'),
+            due_date: createdInvoice.due_date,
+            link_invoice: invoiceLink,
+          }, { patient_id: patient.id, patient_name: payload.nama_lengkap });
+        }
       }
     } catch (e) {
-      console.warn('WA apply_created notification skipped:', e);
+      console.warn('WA apply_created / invoice_created notification error:', e);
     }
 
     return {

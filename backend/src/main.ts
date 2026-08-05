@@ -58,7 +58,13 @@ async function bootstrap() {
       WHERE image_url LIKE '%194.233.91.132%' OR image_url LIKE 'http://storage.alliago.id%'
          OR mobile_image_url LIKE '%194.233.91.132%' OR mobile_image_url LIKE 'http://storage.alliago.id%'
     `);
-    console.log('Schema & URLs ensured: Migrated legacy MinIO HTTP IP URLs to https://storage.alliago.id');
+    // Auto-generate invoice_token for any existing invoices where invoice_token is null or empty
+    await dataSource.query(`
+      UPDATE "ak_invoices" 
+      SET invoice_token = UPPER(SUBSTRING(MD5(RANDOM()::text) FROM 1 FOR 8)) 
+      WHERE invoice_token IS NULL OR invoice_token = ''
+    `);
+    console.log('Schema & URLs ensured: Migrated legacy MinIO HTTP IP URLs & populated missing invoice_token');
   } catch (err) {
     console.warn('Schema migration warning:', err.message);
   }

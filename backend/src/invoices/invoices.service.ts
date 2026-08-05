@@ -72,26 +72,22 @@ export class InvoicesService {
   }
 
   async findByToken(token: string): Promise<Invoice> {
+    const clean = (token || '').trim();
+    const isNum = !isNaN(Number(clean)) && clean !== '';
     const invoice = await this.invoiceRepo.findOne({
-      where: { invoice_token: token },
+      where: [
+        { invoice_token: ILike(clean) },
+        { invoice_number: ILike(clean) },
+        ...(isNum ? [{ id: Number(clean) }] : []),
+      ],
       relations: { patient: true, appointment: true },
     });
-    if (!invoice) throw new NotFoundException(`Invoice dengan token ${token} tidak ditemukan`);
+    if (!invoice) throw new NotFoundException(`Invoice "${token}" tidak ditemukan`);
     return invoice;
   }
 
   async findPublicByCode(code: string): Promise<Invoice> {
-    const isNum = !isNaN(Number(code));
-    const invoice = await this.invoiceRepo.findOne({
-      where: [
-        { invoice_token: code },
-        { invoice_number: code },
-        ...(isNum ? [{ id: Number(code) }] : []),
-      ],
-      relations: { patient: true, appointment: true },
-    });
-    if (!invoice) throw new NotFoundException(`Invoice "${code}" tidak ditemukan`);
-    return invoice;
+    return this.findByToken(code);
   }
 
   async markPaid(id: number): Promise<Invoice> {

@@ -14,7 +14,7 @@ import { TherapyProgressService } from './therapy-progress.service';
 import { CreateTherapyProgressLogDto } from './dto/create-therapy-progress-log.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-@Controller('admin/therapy-progress')
+@Controller(['admin/therapy-progress', 'therapy-progress'])
 @UseGuards(JwtAuthGuard)
 export class TherapyProgressAdminController {
   constructor(private readonly progressService: TherapyProgressService) {}

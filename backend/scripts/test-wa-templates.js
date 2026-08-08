@@ -141,7 +141,9 @@ async function run() {
       results.push({ Trigger: trigger.trigger_event, Label: trigger.label, Result: 'ERROR', Note: err.message });
     }
 
-    await new Promise((r) => setTimeout(r, 1500));
+    // WaSender account protection allows only 1 message every 5 seconds.
+    // Use 6 seconds delay between triggers to comply with rate limits.
+    await new Promise((r) => setTimeout(r, 6000));
   }
 
   console.log();

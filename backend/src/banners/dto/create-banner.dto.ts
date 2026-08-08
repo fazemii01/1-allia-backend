@@ -16,6 +16,18 @@ export class CreateBannerDto {
   @IsOptional()
   sort_order?: number;
 
+  @IsString()
+  @IsOptional()
+  type?: string;
+
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @IsInt()
+  @IsOptional()
+  popup_delay?: number;
+
   @IsBoolean()
   @IsOptional()
   is_active?: boolean;

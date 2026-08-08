@@ -61,6 +61,8 @@ export class InvoicesController {
       const phone = patient?.no_telepon;
       if (phone) {
         const firstItem = full.items?.[0];
+        const invToken = full.invoice_token || full.invoice_number || String(full.id);
+        const invoiceLink = `https://app.alliakids.com/invoice/${invToken}`;
         await this.whatsappService.sendByTrigger('invoice_created', phone, {
           nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
           nama_anak: patient?.nama_lengkap || '',
@@ -68,6 +70,7 @@ export class InvoicesController {
           layanan: firstItem?.description || '',
           total_amount: Number(full.total_amount).toLocaleString('id-ID'),
           due_date: full.due_date,
+          link_invoice: invoiceLink,
         }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
       }
     } catch (e) {
@@ -95,6 +98,25 @@ export class InvoicesController {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    if (original.status !== 'sudah_bayar' && updated.status === 'sudah_bayar') {
+      try {
+        const full = await this.invoicesService.findOne(id);
+        const patient = full.patient;
+        const phone = patient?.no_telepon;
+        if (phone) {
+          await this.whatsappService.sendByTrigger('payment_received', phone, {
+            nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+            nama_anak: patient?.nama_lengkap || '',
+            invoice_number: full.invoice_number,
+            total_amount: Number(full.total_amount).toLocaleString('id-ID'),
+          }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+        }
+      } catch (e) {
+        console.warn('WA payment_received notification skipped on update:', e);
+      }
+    }
+
     return updated;
   }
 
@@ -157,6 +179,8 @@ export class InvoicesController {
 
     if (phone) {
       const firstItem = full.items?.[0];
+      const invToken = full.invoice_token || full.invoice_number || String(full.id);
+      const invoiceLink = `https://app.alliakids.com/invoice/${invToken}`;
       waResult = await this.whatsappService.sendByTrigger('invoice_created', phone, {
         nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
         nama_anak: patient?.nama_lengkap || '',
@@ -164,6 +188,7 @@ export class InvoicesController {
         layanan: firstItem?.description || '',
         total_amount: Number(full.total_amount).toLocaleString('id-ID'),
         due_date: full.due_date,
+        link_invoice: invoiceLink,
       }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
     }
 

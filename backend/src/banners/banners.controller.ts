@@ -34,16 +34,18 @@ export class BannersController {
 
   // Public endpoint for landing page slider
   @Get('banners')
-  findAllActive() {
-    return this.bannersService.findAllActive();
+  findAllActive(@Request() req: any) {
+    const type = req.query?.type;
+    return this.bannersService.findAllActive(type);
   }
 
   // Admin administrative list
   @Get('admin/banners')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'staff')
-  findAllAdmin() {
-    return this.bannersService.findAllAdmin();
+  findAllAdmin(@Request() req: any) {
+    const type = req.query?.type;
+    return this.bannersService.findAllAdmin(type);
   }
 
   // Admin banner creation

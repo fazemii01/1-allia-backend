@@ -17,6 +17,15 @@ export class Banner {
   @Column({ type: 'int', default: 1 })
   sort_order: number;
 
+  @Column({ type: 'varchar', length: 50, default: 'hero' })
+  type: string;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  title: string;
+
+  @Column({ type: 'int', default: 3 })
+  popup_delay: number;
+
   @Column({ type: 'boolean', default: true })
   is_active: boolean;
 

@@ -11,15 +11,24 @@ export class BannersService {
     private readonly bannerRepo: Repository<Banner>,
   ) {}
 
-  async findAllActive(): Promise<Banner[]> {
+  async findAllActive(type?: string): Promise<Banner[]> {
+    const where: any = { is_active: true };
+    if (type) {
+      where.type = type;
+    } else {
+      where.type = 'hero';
+    }
     return this.bannerRepo.find({
-      where: { is_active: true },
+      where,
       order: { sort_order: 'ASC', created_at: 'DESC' },
     });
   }
 
-  async findAllAdmin(): Promise<Banner[]> {
+  async findAllAdmin(type?: string): Promise<Banner[]> {
+    const where: any = {};
+    if (type) where.type = type;
     return this.bannerRepo.find({
+      where,
       order: { sort_order: 'ASC', created_at: 'DESC' },
     });
   }

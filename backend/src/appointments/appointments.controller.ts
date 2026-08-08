@@ -17,6 +17,7 @@ import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
 @Controller('admin/appointments')
 @UseGuards(JwtAuthGuard)
@@ -24,6 +25,7 @@ export class AppointmentsController {
   constructor(
     private readonly appointmentsService: AppointmentsService,
     private readonly activityLogsService: ActivityLogsService,
+    private readonly whatsappService: WhatsAppService,
   ) {}
 
   @Get()
@@ -57,6 +59,32 @@ export class AppointmentsController {
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
+
+    // Auto-trigger session_reminder WA notification
+    try {
+      const full = await this.appointmentsService.findOne(appointment.id);
+      const patient = full.patient;
+      const therapist = full.therapist;
+      const phone = patient?.no_telepon;
+
+      if (phone) {
+        const sched = new Date(full.scheduled_at);
+        const tanggalSesi = sched.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const jamSesi = sched.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+
+        await this.whatsappService.sendByTrigger('session_reminder', phone, {
+          nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+          nama_anak: patient?.nama_lengkap || '',
+          jenis_terapi: patient?.jenis_terapi || full.notes || 'Terapi',
+          tanggal_sesi: tanggalSesi,
+          jam_sesi: jamSesi,
+          nama_terapis: therapist?.name || 'Tim Terapis',
+        }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+      }
+    } catch (e) {
+      console.warn('WA session_reminder notification skipped:', e);
+    }
+
     return appointment;
   }
 
@@ -97,5 +125,41 @@ export class AppointmentsController {
       userAgent: req.headers['user-agent'],
     });
     return result;
+  }
+
+  @Post(':id/send-reminder')
+  async sendReminder(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    const full = await this.appointmentsService.findOne(id);
+    const patient = full.patient;
+    const therapist = full.therapist;
+    const phone = patient?.no_telepon;
+    let waResult: any = null;
+
+    if (phone) {
+      const sched = new Date(full.scheduled_at);
+      const tanggalSesi = sched.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const jamSesi = sched.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+
+      waResult = await this.whatsappService.sendByTrigger('session_reminder', phone, {
+        nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+        nama_anak: patient?.nama_lengkap || '',
+        jenis_terapi: patient?.jenis_terapi || full.notes || 'Terapi',
+        tanggal_sesi: tanggalSesi,
+        jam_sesi: jamSesi,
+        nama_terapis: therapist?.name || 'Tim Terapis',
+      }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+    }
+
+    await this.activityLogsService.log({
+      userId: req.user.userId,
+      action: 'whatsapp',
+      modelType: 'Appointment',
+      modelId: String(id),
+      description: `Sent Session Reminder WA Notification for Appointment ID: ${id}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    return { appointment: full, whatsapp: waResult };
   }
 }

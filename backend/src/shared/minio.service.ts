@@ -20,7 +20,14 @@ export class MinioService implements OnModuleInit {
 
   async onModuleInit() {
     let endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'storage.alliago.id');
-    let port = parseInt(this.configService.get<string>('MINIO_PORT', '9000'), 10);
+    
+    // Determine SSL configuration (default to true for storage.alliago.id)
+    const secureEnv = this.configService.get<string>('MINIO_SECURE');
+    const sslEnv = this.configService.get<string>('MINIO_USE_SSL') || this.configService.get<string>('MINIO_SSL');
+    const useSSL = secureEnv !== undefined ? secureEnv === 'true' : (sslEnv !== undefined ? sslEnv === 'true' : true);
+
+    let portDefault = useSSL ? '443' : '9000';
+    let port = parseInt(this.configService.get<string>('MINIO_PORT', portDefault), 10);
 
     if (endPoint.includes(':')) {
       const parts = endPoint.split(':');
@@ -28,22 +35,28 @@ export class MinioService implements OnModuleInit {
       port = parseInt(parts[1], 10);
     }
 
+    // If useSSL is enabled but port is still set to 9000, override port to 443 to avoid ETIMEDOUT
+    if (useSSL && port === 9000) {
+      port = 443;
+    }
+
     const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY', 'minioadmin');
     const secretKey = this.configService.get<string>('MINIO_SECRET_KEY', 'minioadmin');
-    
-    const useSSL = this.configService.get<string>('MINIO_SECURE', 'false') === 'true' || 
-                   this.configService.get<string>('MINIO_USE_SSL', 'false') === 'true';
 
     this.bucketName = this.configService.get<string>('MINIO_BUCKET_NAME') || 
-                      this.configService.get<string>('MINIO_BUCKET', 'alliakids');
+                      this.configService.get<string>('MINIO_BUCKET', 'alliakids-new');
 
-    this.minioClient = new Minio.Client({
+    const clientOpts: any = {
       endPoint,
-      port,
       useSSL,
       accessKey,
       secretKey,
-    });
+    };
+    if (port) {
+      clientOpts.port = port;
+    }
+
+    this.minioClient = new Minio.Client(clientOpts);
 
     this.logger.log(`MinIO Client initialized for endpoint: ${endPoint}:${port}, bucket: ${this.bucketName}, useSSL: ${useSSL}`);
 

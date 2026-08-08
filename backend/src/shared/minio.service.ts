@@ -5,7 +5,7 @@ import * as Minio from 'minio';
 export function normalizeStorageUrl(url: string | null | undefined): string {
   if (!url) return '';
   return url
-    .replace(/^http:\/\/194\.233\.91\.132:\d+/i, 'https://storage.alliago.id')
+    .replace(/^https?:\/\/(?:194\.233\.91\.132|localhost)(?::\d+)?/i, 'https://storage.alliago.id')
     .replace(/^http:\/\/storage\.alliago\.id/i, 'https://storage.alliago.id')
     .replace(/^http:\/\//i, 'https://');
 }
@@ -100,10 +100,8 @@ export class MinioService implements OnModuleInit {
 
       this.logger.log(`Uploaded file ${objectName} to bucket ${this.bucketName}`);
 
-      let endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'storage.alliago.id');
-      const host = endPoint.includes(':') ? endPoint.split(':')[0] : endPoint;
-
-      const rawUrl = `https://${host}/${this.bucketName}/${cleanFolder}/${filename}`;
+      const publicBaseUrl = this.configService.get<string>('MINIO_PUBLIC_URL', 'https://storage.alliago.id').replace(/\/+$/, '');
+      const rawUrl = `${publicBaseUrl}/${this.bucketName}/${cleanFolder}/${filename}`;
       return normalizeStorageUrl(rawUrl);
     } catch (err: any) {
       this.logger.error(`Failed to upload file to MinIO: ${err.message}`, err.stack);

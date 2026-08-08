@@ -119,7 +119,7 @@ export class WhatsAppService {
     meta?: { patient_id?: number; patient_name?: string },
   ): Promise<{ sent: boolean; template_id?: string; error?: string }> {
     const tpl = await this.templateRepo.findOne({
-      where: { trigger_event: triggerEvent, auto_send: true, is_active: true },
+      where: { trigger_event: triggerEvent, is_active: true },
     });
 
     let templateBody = tpl?.body;

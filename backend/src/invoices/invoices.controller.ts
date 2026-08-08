@@ -10,6 +10,7 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  BadRequestException,
 } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
@@ -174,22 +175,28 @@ export class InvoicesController {
   async sendWhatsApp(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     const full = await this.invoicesService.findOne(id);
     const patient = full.patient;
-    const phone = patient?.no_telepon;
-    let waResult: any = null;
+    const phone = patient?.no_telepon || full.appointment?.patient?.no_telepon || (full.appointment as any)?.no_telepon;
 
-    if (phone) {
-      const firstItem = full.items?.[0];
-      const invToken = full.invoice_token || full.invoice_number || String(full.id);
-      const invoiceLink = `https://app.alliakids.com/invoice/${invToken}`;
-      waResult = await this.whatsappService.sendByTrigger('invoice_created', phone, {
-        nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
-        nama_anak: patient?.nama_lengkap || '',
-        invoice_number: full.invoice_number,
-        layanan: firstItem?.description || '',
-        total_amount: Number(full.total_amount).toLocaleString('id-ID'),
-        due_date: full.due_date,
-        link_invoice: invoiceLink,
-      }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+    if (!phone) {
+      throw new BadRequestException(`Pasien untuk invoice #${full.invoice_number} tidak memiliki nomor WhatsApp yang terdaftar.`);
+    }
+
+    const firstItem = full.items?.[0];
+    const invToken = full.invoice_token || full.invoice_number || String(full.id);
+    const invoiceLink = `https://app.alliakids.com/invoice/${invToken}`;
+
+    const waResult = await this.whatsappService.sendByTrigger('invoice_created', phone, {
+      nama_ortu: patient?.nama_ibu || patient?.nama_ayah || 'Bapak/Ibu',
+      nama_anak: patient?.nama_lengkap || '',
+      invoice_number: full.invoice_number,
+      layanan: firstItem?.description || '',
+      total_amount: Number(full.total_amount).toLocaleString('id-ID'),
+      due_date: full.due_date,
+      link_invoice: invoiceLink,
+    }, { patient_id: full.patient_id, patient_name: patient?.nama_lengkap });
+
+    if (waResult?.sent === false) {
+      throw new BadRequestException(waResult.error || 'Gagal mengirim pesan WhatsApp via WaSender');
     }
 
     const result = await this.invoicesService.recordWaSent(id);
@@ -198,11 +205,12 @@ export class InvoicesController {
       action: 'whatsapp',
       modelType: 'Invoice',
       modelId: String(id),
-      description: `Sent Invoice WhatsApp Notification for Invoice ID: ${id} (${full.invoice_number})`,
+      description: `Sent Invoice WhatsApp Notification for Invoice ID: ${id} (${full.invoice_number}) to ${phone}`,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    return { invoice: result, whatsapp: waResult };
+
+    return { invoice: result, whatsapp: waResult, recipient: phone };
   }
 
   @Delete(':id')
